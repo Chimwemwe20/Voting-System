@@ -9,23 +9,23 @@ import { BarChart3, CalendarDays, Plus, Users, Vote } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 
 export default function AdminDashboard() {
   const router = useRouter()
   const { account, isAdmin, isLoading, getElections, getCandidatesCount, isElectionActive, getElectionDetails } = useContractInteraction()
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [page, setPage] = useState(0) // Pagination state
+  const [hasMore, setHasMore] = useState(true) // Flag for more data
+  const [elections, setElections] = useState([]) // Store elections
+
   const [stats, setStats] = useState({
     totalElections: 0,
     activeElections: 0,
     totalCandidates: 0,
     totalVotes: 0,
   })
-  const [electionData, setElectionData] = useState<any[]>([])
   const [isLoadingStats, setIsLoadingStats] = useState(true)
-
-  const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))']
 
   useEffect(() => {
     if (isLoading) return;
@@ -35,55 +35,54 @@ export default function AdminDashboard() {
       return
     }
 
-    const loadDashboardData = async () => {
-      try {
-        setIsLoadingStats(true)
-        const elections = await getElections(0, 10)
-        let activeCount = 0
-        let candidatesCount = 0
-        let votesCount = 0
-        const electionStats = []
+    loadMoreElections() // Initial load
+  }, [account, isAdmin, isLoading, router])
 
-        for (const election of elections) {
-          const isActive = await isElectionActive(election.id)
-          if (isActive) activeCount++
+  const loadMoreElections = async () => {
+    try {
+      setIsLoadingStats(true)
 
-          const candidates = await getCandidatesCount(election.id)
-          candidatesCount += parseInt(candidates)
+      const newElections = await getElections(page * 5, 5) // Fetch 5 elections at a time
 
-          const electionData = await getElectionDetails(election.id)
-          if (electionData) {
-            votesCount += parseInt(electionData.totalVotes)
-            electionStats.push({
-              name: election.name,
-              votes: parseInt(electionData.totalVotes),
-              candidates: parseInt(candidates)
-            })
-          }
-        }
-
-        setStats({
-          totalElections: elections.length,
-          activeElections: activeCount,
-          totalCandidates: candidatesCount,
-          totalVotes: votesCount,
-        })
-
-        setElectionData(electionStats)
-      } catch (error) {
-        console.error("Error loading dashboard data:", error)
-      } finally {
+      if (newElections.length === 0) {
+        setHasMore(false) // Stop if no more elections
         setIsLoadingStats(false)
+        return
       }
+
+      setElections((prev) => [...prev, ...newElections])
+      setPage((prev) => prev + 1)
+
+      const electionIds = newElections.map(e => e.id)
+
+      if (electionIds.length === 0) {
+        setStats({ totalElections: 0, activeElections: 0, totalCandidates: 0, totalVotes: 0 })
+        return
+      }
+
+      // Fetch all data in parallel
+      const [activeStatuses, candidatesCounts, electionDetails] = await Promise.all([
+        Promise.all(electionIds.map(id => isElectionActive(id))),
+        Promise.all(electionIds.map(id => getCandidatesCount(id))),
+        Promise.all(electionIds.map(id => getElectionDetails(id))),
+      ])
+
+      const activeCount = activeStatuses.filter(Boolean).length
+      const totalCandidates = candidatesCounts.reduce((sum, count) => sum + parseInt(count), 0)
+      const totalVotes = electionDetails.reduce((sum, details) => sum + parseInt(details.totalVotes), 0)
+
+      setStats((prev) => ({
+        totalElections: prev.totalElections + newElections.length,
+        activeElections: prev.activeElections + activeCount,
+        totalCandidates: prev.totalCandidates + totalCandidates,
+        totalVotes: prev.totalVotes + totalVotes,
+      }))
+    } catch (error) {
+      console.error("Error loading dashboard data:", error)
+    } finally {
+      setIsLoadingStats(false)
     }
-
-    loadDashboardData()
-  }, [account, isAdmin, isLoading, router, getElections, getCandidatesCount, isElectionActive, getElectionDetails])
-
-  const pieData = [
-    { name: 'Active Elections', value: stats.activeElections },
-    { name: 'Inactive Elections', value: stats.totalElections - stats.activeElections },
-  ]
+  }
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -108,69 +107,10 @@ export default function AdminDashboard() {
           <div className="mt-8 grid gap-6 md:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle>Election Statistics</CardTitle>
-                <CardDescription>Votes and candidates per election</CardDescription>
-              </CardHeader>
-              <CardContent className="h-[400px]">
-                {isLoadingStats ? (
-                  <div className="flex h-full items-center justify-center">
-                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-                  </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={electionData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" />
-                      <YAxis />
-                      <Tooltip />
-                      <Bar dataKey="votes" fill="hsl(var(--chart-1))" name="Votes" />
-                      <Bar dataKey="candidates" fill="hsl(var(--chart-2))" name="Candidates" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Election Status</CardTitle>
-                <CardDescription>Active vs Inactive Elections</CardDescription>
-              </CardHeader>
-              <CardContent className="h-[400px]">
-                {isLoadingStats ? (
-                  <div className="flex h-full items-center justify-center">
-                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-                  </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={pieData}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                        outerRadius={150}
-                        fill="#8884d8"
-                        dataKey="value"
-                      >
-                        {pieData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="md:col-span-2">
-              <CardHeader>
                 <CardTitle>Quick Actions</CardTitle>
                 <CardDescription>Common administrative tasks</CardDescription>
               </CardHeader>
-              <CardContent className="grid gap-4 md:grid-cols-3">
+              <CardContent className="grid gap-4">
                 <Button asChild className="bg-green-600 hover:bg-green-700">
                   <Link href="/dashboard/admin/elections/create">
                     <Plus className="mr-2 h-4 w-4" />
@@ -192,6 +132,16 @@ export default function AdminDashboard() {
               </CardContent>
             </Card>
           </div>
+
+          {hasMore && (
+            <button
+              onClick={loadMoreElections}
+              disabled={isLoadingStats}
+              className="mt-4 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+            >
+              {isLoadingStats ? "Loading..." : "Load More Elections"}
+            </button>
+          )}
         </main>
       </div>
     </div>

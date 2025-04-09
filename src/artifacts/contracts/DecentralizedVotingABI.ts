@@ -261,9 +261,14 @@ export const DecentralizedVotingABI = [
                 "internalType": "string[]",
                 "name": "_locations",
                 "type": "string[]"
+            },
+            {
+                "internalType": "string[]",
+                "name": "_candidateNames",
+                "type": "string[]"
             }
         ],
-        "name": "createElection",
+        "name": "createElectionBatch",
         "outputs": [],
         "stateMutability": "nonpayable",
         "type": "function"

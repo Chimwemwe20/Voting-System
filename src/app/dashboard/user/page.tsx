@@ -1,12 +1,15 @@
 "use client"
 
-import { Header } from "@/components/layout/header"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import useContractInteraction from "@/lib/useContractInteraction"
-import { CalendarDays, Loader2, Vote } from "lucide-react"
-import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
+import { Loader2 } from "lucide-react"
+import useContractInteraction from "@/lib/useContractInteraction"
+import Layout from "./components/Layout"
+import StatCards from "./components/StatCards"
+import QuickActions from "./components/QuickActions"
+import ActiveElections from "./components/ActiveElections"
+import UpcomingElections from "./components/UpcomingElections"
+import VotingHistory from "./components/VotingHistory"
 
 export default function UserDashboard() {
   const router = useRouter()
@@ -17,11 +20,13 @@ export default function UserDashboard() {
     isLoading,
     getElections,
     hasUserVoted,
-    isElectionActive
+    getElectionDetails
   } = useContractInteraction()
   
-  const [activeElections, setActiveElections] = useState<any[]>([])
-  const [votingHistory, setVotingHistory] = useState<any[]>([])
+  const [activeElections, setActiveElections] = useState([])
+  const [upcomingElections, setUpcomingElections] = useState([])
+  const [completedElections, setCompletedElections] = useState([])
+  const [votingHistory, setVotingHistory] = useState([])
   const [isLoadingData, setIsLoadingData] = useState(true)
 
   useEffect(() => {
@@ -40,23 +45,57 @@ export default function UserDashboard() {
     const loadUserData = async () => {
       try {
         setIsLoadingData(true)
-        const elections = await getElections(0, 10)
+        const electionsResult = await getElections(0, 50)
+        
+        if (!electionsResult.success) {
+          console.error("Failed to fetch elections:", electionsResult.error)
+          return
+        }
+
+        const elections = electionsResult.elections
         const active = []
+        const upcoming = []
+        const completed = []
         const history = []
+        const now = Math.floor(Date.now() / 1000)
 
         for (const election of elections) {
-          const activeStatus = await isElectionActive(election.id)
-          const votedStatus = await hasUserVoted(election.id)
-
-          if (activeStatus) {
-            active.push(election)
+          // Get full election details to access start and end times
+          const detailsResult = await getElectionDetails(election.id)
+          if (!detailsResult.success || !detailsResult.election) continue
+          
+          const fullElection = detailsResult.election
+          const startTime = parseInt(fullElection.startTime)
+          const endTime = parseInt(fullElection.endTime)
+          
+          // Check if user has voted in this election
+          const votedResult = await hasUserVoted(election.id)
+          const hasVoted = votedResult.success && votedResult.hasVoted
+          
+          const electionWithDetails = {
+            ...election,
+            startTime,
+            endTime,
+            hasVoted
           }
-          if (votedStatus) {
-            history.push(election)
+          
+          // Categorize election
+          if (now < startTime) {
+            upcoming.push(electionWithDetails)
+          } else if (now >= startTime && now <= endTime) {
+            active.push(electionWithDetails)
+          } else {
+            completed.push(electionWithDetails)
+          }
+          
+          if (hasVoted) {
+            history.push(electionWithDetails)
           }
         }
 
         setActiveElections(active)
+        setUpcomingElections(upcoming)
+        setCompletedElections(completed)
         setVotingHistory(history)
       } catch (error) {
         console.error("Error loading user data:", error)
@@ -66,16 +105,15 @@ export default function UserDashboard() {
     }
 
     loadUserData()
-  }, [account, isAdmin, isRegistered, isLoading, router, getElections, hasUserVoted, isElectionActive])
+  }, [account, isAdmin, isRegistered, isLoading, router, getElections, hasUserVoted, getElectionDetails])
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <Header />
-
-      <main className="flex-1 bg-green-50 p-4 md:p-6">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-green-900">Voter Dashboard</h1>
-          <p className="text-gray-600">View and participate in elections</p>
+    <Layout account={account}>
+      <div className="max-w-7xl mx-auto">
+        {/* Page header */}
+        <div className="mb-8">
+          <h1 className="text-2xl font-medium text-gray-900">Voter Dashboard</h1>
+          <p className="text-sm text-gray-500 mt-1">View and participate in elections</p>
         </div>
 
         {isLoadingData ? (
@@ -83,86 +121,25 @@ export default function UserDashboard() {
             <Loader2 className="h-8 w-8 animate-spin text-green-600" />
           </div>
         ) : (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            <Card>
-              <CardHeader>
-                <CardTitle>Your Profile</CardTitle>
-                <CardDescription>Your voter information</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <div>
-                    <p className="text-sm font-medium text-gray-500">Wallet Address</p>
-                    <p className="text-sm font-mono">{account}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-500">Status</p>
-                    <p className="text-sm text-green-600">Registered Voter</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>Active Elections</CardTitle>
-                  <CardDescription>Elections you can vote in</CardDescription>
-                </div>
-                <Vote className="h-5 w-5 text-gray-500" />
-              </CardHeader>
-              <CardContent>
-                {activeElections.length > 0 ? (
-                  <div className="space-y-4">
-                    {activeElections.map((election) => (
-                      <div key={election.id} className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium">{election.name}</p>
-                          <p className="text-sm text-gray-500">{election.electionType}</p>
-                        </div>
-                        <Button
-                          onClick={() => router.push(`/elections/${election.id}`)}
-                          className="bg-green-600 hover:bg-green-700"
-                        >
-                          Vote Now
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-500">No active elections available.</p>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>Voting History</CardTitle>
-                  <CardDescription>Your past votes</CardDescription>
-                </div>
-                <CalendarDays className="h-5 w-5 text-gray-500" />
-              </CardHeader>
-              <CardContent>
-                {votingHistory.length > 0 ? (
-                  <div className="space-y-4">
-                    {votingHistory.map((election) => (
-                      <div key={election.id}>
-                        <p className="font-medium">{election.name}</p>
-                        <p className="text-sm text-gray-500">
-                          Voted on {new Date(election.voteDate).toLocaleDateString()}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-500">You haven't voted in any elections yet.</p>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+          <>
+            <StatCards 
+              activeCount={activeElections.length} 
+              upcomingCount={upcomingElections.length} 
+              completedCount={completedElections.length} 
+              votedCount={votingHistory.length} 
+            />
+            
+            <QuickActions router={router} />
+            
+            <ActiveElections elections={activeElections} router={router} />
+            
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <UpcomingElections elections={upcomingElections} router={router} />
+              <VotingHistory elections={votingHistory} router={router} />
+            </div>
+          </>
         )}
-      </main>
-    </div>
+      </div>
+    </Layout>
   )
 }

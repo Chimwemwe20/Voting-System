@@ -1,180 +1,317 @@
 "use client"
 
-import { Header } from "@/components/layout/header"
-import { Sidebar } from "@/components/layout/sidebar"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import useContractInteraction from "@/lib/useContractInteraction"
-import { BarChart3, CalendarDays, Plus, Users, Vote } from "lucide-react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
+import { BarChart3, Calendar, CheckCircle, Clock, Users, Vote } from "lucide-react"
+import useContractInteraction from "@/lib/useContractInteraction"
 
-export default function AdminDashboard() {
-  const router = useRouter()
-  const { account, isAdmin, isLoading, getElections, getCandidatesCount, isElectionActive, getElectionDetails } = useContractInteraction()
-
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-  const [page, setPage] = useState(0) // Pagination state
-  const [hasMore, setHasMore] = useState(true) // Flag for more data
-  const [elections, setElections] = useState([]) // Store elections
-
+export default function AdminPage() {
+  const { getElections, getElectionsCount, isAdmin, isLoading } = useContractInteraction()
   const [stats, setStats] = useState({
     totalElections: 0,
     activeElections: 0,
-    totalCandidates: 0,
+    upcomingElections: 0,
+    completedElections: 0,
     totalVotes: 0,
   })
-  const [isLoadingStats, setIsLoadingStats] = useState(true)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
-    if (isLoading) return;
-    
-    if (!account || !isAdmin) {
-      router.replace("/dashboard/user")
-      return
+    const fetchStats = async () => {
+      try {
+        setLoading(true)
+
+        // Get total elections count
+        const countResult = await getElectionsCount()
+        const totalElections = countResult.success ? Number(countResult.count) : 0
+
+        // Get elections data
+        const result = await getElections(0, 100)
+
+        if (result.success) {
+          const now = Date.now()
+          let activeCount = 0
+          let upcomingCount = 0
+          let completedCount = 0
+          let totalVotes = 0
+
+          result.elections.forEach((election) => {
+            const startTime = Number(election.startTime) * 1000
+            const endTime = Number(election.endTime) * 1000
+
+            if (now > endTime) {
+              completedCount++
+            } else if (now > startTime) {
+              activeCount++
+            } else {
+              upcomingCount++
+            }
+
+            totalVotes += Number(election.totalVotes)
+          })
+
+          setStats({
+            totalElections,
+            activeElections: activeCount,
+            upcomingElections: upcomingCount,
+            completedElections: completedCount,
+            totalVotes,
+          })
+        }
+      } catch (err) {
+        console.error("Error fetching stats:", err)
+        setError("Failed to load dashboard statistics")
+      } finally {
+        setLoading(false)
+      }
     }
 
-    loadMoreElections() // Initial load
-  }, [account, isAdmin, isLoading, router])
-
-  const loadMoreElections = async () => {
-    try {
-      setIsLoadingStats(true)
-
-      const newElections = await getElections(page * 5, 5) // Fetch 5 elections at a time
-
-      if (newElections.length === 0) {
-        setHasMore(false) // Stop if no more elections
-        setIsLoadingStats(false)
-        return
-      }
-
-      setElections((prev) => [...prev, ...newElections])
-      setPage((prev) => prev + 1)
-
-      const electionIds = newElections.map(e => e.id)
-
-      if (electionIds.length === 0) {
-        setStats({ totalElections: 0, activeElections: 0, totalCandidates: 0, totalVotes: 0 })
-        return
-      }
-
-      // Fetch all data in parallel
-      const [activeStatuses, candidatesCounts, electionDetails] = await Promise.all([
-        Promise.all(electionIds.map(id => isElectionActive(id))),
-        Promise.all(electionIds.map(id => getCandidatesCount(id))),
-        Promise.all(electionIds.map(id => getElectionDetails(id))),
-      ])
-
-      const activeCount = activeStatuses.filter(Boolean).length
-      const totalCandidates = candidatesCounts.reduce((sum, count) => sum + parseInt(count), 0)
-      const totalVotes = electionDetails.reduce((sum, details) => sum + parseInt(details.totalVotes), 0)
-
-      setStats((prev) => ({
-        totalElections: prev.totalElections + newElections.length,
-        activeElections: prev.activeElections + activeCount,
-        totalCandidates: prev.totalCandidates + totalCandidates,
-        totalVotes: prev.totalVotes + totalVotes,
-      }))
-    } catch (error) {
-      console.error("Error loading dashboard data:", error)
-    } finally {
-      setIsLoadingStats(false)
+    if (!isLoading) {
+      fetchStats()
     }
+  }, [getElections, getElectionsCount, isLoading])
+
+  if (isLoading || loading) {
+    return <div className="flex h-full items-center justify-center">Loading dashboard...</div>
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="bg-red-50 border-l-4 border-red-400 p-4 my-4">
+        <div className="flex">
+          <div className="ml-3">
+            <p className="text-sm text-red-700">You do not have admin privileges to access this page.</p>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <Header toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} showMenuButton={true} />
-
-      <div className="flex flex-1">
-        <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
-
-        <main className="flex-1 bg-green-50 p-4 md:p-6">
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold text-green-900">Admin Dashboard</h1>
-            <p className="text-gray-600">Manage elections, candidates, and view results</p>
-          </div>
-
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-            <StatsCard title="Total Elections" value={stats.totalElections} description="Elections created" icon={CalendarDays} isLoading={isLoadingStats} />
-            <StatsCard title="Active Elections" value={stats.activeElections} description="Currently running" icon={Vote} isLoading={isLoadingStats} />
-            <StatsCard title="Total Candidates" value={stats.totalCandidates} description="Across all elections" icon={Users} isLoading={isLoadingStats} />
-            <StatsCard title="Total Votes" value={stats.totalVotes} description="Votes cast" icon={BarChart3} isLoading={isLoadingStats} />
-          </div>
-
-          <div className="mt-8 grid gap-6 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Quick Actions</CardTitle>
-                <CardDescription>Common administrative tasks</CardDescription>
-              </CardHeader>
-              <CardContent className="grid gap-4">
-                <Button asChild className="bg-green-600 hover:bg-green-700">
-                  <Link href="/dashboard/admin/elections/create">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Create New Election
-                  </Link>
-                </Button>
-                <Button asChild variant="outline">
-                  <Link href="/dashboard/admin/elections">
-                    <Vote className="mr-2 h-4 w-4" />
-                    Manage Elections
-                  </Link>
-                </Button>
-                <Button asChild variant="outline">
-                  <Link href="/dashboard/admin/results">
-                    <BarChart3 className="mr-2 h-4 w-4" />
-                    View Results
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-
-          {hasMore && (
-            <button
-              onClick={loadMoreElections}
-              disabled={isLoadingStats}
-              className="mt-4 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-            >
-              {isLoadingStats ? "Loading..." : "Load More Elections"}
-            </button>
-          )}
-        </main>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold text-gray-900">Admin Dashboard</h1>
+        <p className="mt-1 text-sm text-gray-500">Overview of your election system</p>
       </div>
-    </div>
-  )
-}
 
-interface StatsCardProps {
-  title: string
-  value: number
-  description: string
-  icon: React.ElementType
-  isLoading: boolean
-}
-
-function StatsCard({ title, value, description, icon: Icon, isLoading }: StatsCardProps) {
-  return (
-    <Card>
-      <CardContent className="p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-gray-500">{title}</p>
-            {isLoading ? (
-              <div className="mt-2 h-7 w-16 animate-pulse rounded bg-gray-200" />
-            ) : (
-              <p className="mt-2 text-3xl font-bold text-green-700">{value}</p>
-            )}
-            <p className="mt-1 text-xs text-gray-500">{description}</p>
-          </div>
-          <div className="rounded-full bg-green-100 p-3">
-            <Icon className="h-6 w-6 text-green-600" />
+      {error && (
+        <div className="bg-red-50 border-l-4 border-red-400 p-4">
+          <div className="flex">
+            <div className="ml-3">
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      )}
+
+      {/* Stats cards */}
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="overflow-hidden rounded-lg bg-white shadow">
+          <div className="p-5">
+            <div className="flex items-center">
+              <div className="flex-shrink-0 rounded-md bg-green-100 p-3">
+                <Vote className="h-6 w-6 text-green-600" />
+              </div>
+              <div className="ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-sm font-medium text-gray-500 truncate">Total Elections</dt>
+                  <dd>
+                    <div className="text-lg font-medium text-gray-900">{stats.totalElections}</div>
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </div>
+          <div className="bg-gray-50 px-5 py-3">
+            <div className="text-sm">
+              <Link href="/dashboard/admin/election" className="font-medium text-green-700 hover:text-green-900">
+                View all
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        <div className="overflow-hidden rounded-lg bg-white shadow">
+          <div className="p-5">
+            <div className="flex items-center">
+              <div className="flex-shrink-0 rounded-md bg-blue-100 p-3">
+                <Clock className="h-6 w-6 text-blue-600" />
+              </div>
+              <div className="ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-sm font-medium text-gray-500 truncate">Active Elections</dt>
+                  <dd>
+                    <div className="text-lg font-medium text-gray-900">{stats.activeElections}</div>
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </div>
+          <div className="bg-gray-50 px-5 py-3">
+            <div className="text-sm">
+              <Link href="/dashboard/admin/election" className="font-medium text-blue-700 hover:text-blue-900">
+                View active
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        <div className="overflow-hidden rounded-lg bg-white shadow">
+          <div className="p-5">
+            <div className="flex items-center">
+              <div className="flex-shrink-0 rounded-md bg-yellow-100 p-3">
+                <Calendar className="h-6 w-6 text-yellow-600" />
+              </div>
+              <div className="ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-sm font-medium text-gray-500 truncate">Upcoming Elections</dt>
+                  <dd>
+                    <div className="text-lg font-medium text-gray-900">{stats.upcomingElections}</div>
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </div>
+          <div className="bg-gray-50 px-5 py-3">
+            <div className="text-sm">
+              <Link href="/dashboard/admin/election" className="font-medium text-yellow-700 hover:text-yellow-900">
+                View upcoming
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        <div className="overflow-hidden rounded-lg bg-white shadow">
+          <div className="p-5">
+            <div className="flex items-center">
+              <div className="flex-shrink-0 rounded-md bg-purple-100 p-3">
+                <CheckCircle className="h-6 w-6 text-purple-600" />
+              </div>
+              <div className="ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-sm font-medium text-gray-500 truncate">Completed Elections</dt>
+                  <dd>
+                    <div className="text-lg font-medium text-gray-900">{stats.completedElections}</div>
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </div>
+          <div className="bg-gray-50 px-5 py-3">
+            <div className="text-sm">
+              <Link href="/dashboard/admin/election" className="font-medium text-purple-700 hover:text-purple-900">
+                View completed
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Quick actions */}
+      <div className="overflow-hidden rounded-lg bg-white shadow">
+        <div className="px-4 py-5 sm:p-6">
+          <h2 className="text-lg font-medium text-gray-900">Quick Actions</h2>
+          <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <Link
+              href="/dashboard/admin/election/create"
+              className="inline-flex items-center justify-center rounded-md border border-transparent bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+            >
+              Create New Election
+            </Link>
+            <Link
+              href="/dashboard/admin/election"
+              className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+            >
+              Manage Elections
+            </Link>
+            <Link
+              href="#"
+              className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+            >
+              View Reports
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* Recent activity */}
+      <div className="overflow-hidden rounded-lg bg-white shadow">
+        <div className="px-4 py-5 sm:p-6">
+          <h2 className="text-lg font-medium text-gray-900">Recent Activity</h2>
+          <div className="mt-5 flow-root">
+            <ul className="-mb-8">
+              <li>
+                <div className="relative pb-8">
+                  <span className="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true"></span>
+                  <div className="relative flex space-x-3">
+                    <div>
+                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100 ring-8 ring-white">
+                        <Vote className="h-5 w-5 text-green-500" />
+                      </span>
+                    </div>
+                    <div className="flex min-w-0 flex-1 justify-between space-x-4 pt-1.5">
+                      <div>
+                        <p className="text-sm text-gray-500">
+                          New election <span className="font-medium text-gray-900">Presidential Election 2024</span> was
+                          created
+                        </p>
+                      </div>
+                      <div className="whitespace-nowrap text-right text-sm text-gray-500">
+                        <time dateTime="2023-09-20">1 hour ago</time>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </li>
+              <li>
+                <div className="relative pb-8">
+                  <span className="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true"></span>
+                  <div className="relative flex space-x-3">
+                    <div>
+                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 ring-8 ring-white">
+                        <Users className="h-5 w-5 text-blue-500" />
+                      </span>
+                    </div>
+                    <div className="flex min-w-0 flex-1 justify-between space-x-4 pt-1.5">
+                      <div>
+                        <p className="text-sm text-gray-500">
+                          <span className="font-medium text-gray-900">5 new voters</span> registered in the system
+                        </p>
+                      </div>
+                      <div className="whitespace-nowrap text-right text-sm text-gray-500">
+                        <time dateTime="2023-09-20">3 hours ago</time>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </li>
+              <li>
+                <div className="relative pb-8">
+                  <div className="relative flex space-x-3">
+                    <div>
+                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-100 ring-8 ring-white">
+                        <BarChart3 className="h-5 w-5 text-purple-500" />
+                      </span>
+                    </div>
+                    <div className="flex min-w-0 flex-1 justify-between space-x-4 pt-1.5">
+                      <div>
+                        <p className="text-sm text-gray-500">
+                          <span className="font-medium text-gray-900">Local Council Election</span> has ended with 245
+                          total votes
+                        </p>
+                      </div>
+                      <div className="whitespace-nowrap text-right text-sm text-gray-500">
+                        <time dateTime="2023-09-19">Yesterday</time>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }

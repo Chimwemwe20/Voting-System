@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { 
   initializeProvider, 
@@ -138,18 +137,21 @@ export default function ConnectPage() {
           <p className="mt-2 text-gray-600">Loading wallet status...</p>
         </div>
       ) : !account ? (
-        <Button onClick={handleConnect} className="bg-green-600 hover:bg-green-700">
+        <button 
+          onClick={handleConnect} 
+          className="px-4 py-2 rounded-md text-white bg-green-600 hover:bg-green-700 font-medium"
+        >
           Connect Wallet
-        </Button>
+        </button>
       ) : !isRegistered ? (
         <div className="flex flex-col items-center gap-4">
           <p className="text-gray-600">Wallet connected but not registered.</p>
-          <Button 
+          <button 
             onClick={handleRegister}
-            className="bg-green-600 hover:bg-green-700"
+            className="px-4 py-2 rounded-md text-white bg-green-600 hover:bg-green-700 font-medium"
           >
             Register
-          </Button>
+          </button>
         </div>
       ) : (
         <div className="flex flex-col items-center">

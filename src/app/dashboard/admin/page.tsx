@@ -2,20 +2,23 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { BarChart3, Calendar, CheckCircle, Clock, Users, Vote } from "lucide-react"
+import { BarChart3, Calendar, CheckCircle, Clock, Users, Vote, Plus, BarChart, FileText } from "lucide-react"
 import useContractInteraction from "@/lib/useContractInteraction"
+import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 
 export default function AdminPage() {
   const { getElections, getElectionsCount, isAdmin, isLoading } = useContractInteraction()
   const [stats, setStats] = useState({
     totalElections: 0,
     activeElections: 0,
-    upcomingElections: 0,
     completedElections: 0,
-    totalVotes: 0,
+    totalVotesInCompletedElections: 0
   })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  
+  // Sample data for the chart - will be replaced with real data
+  const [chartData, setChartData] = useState([])
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -32,32 +35,42 @@ export default function AdminPage() {
         if (result.success) {
           const now = Date.now()
           let activeCount = 0
-          let upcomingCount = 0
           let completedCount = 0
-          let totalVotes = 0
+          let votesInCompletedElections = 0
+          
+          // Process elections for chart data
+          const completedElectionData = []
 
           result.elections.forEach((election) => {
             const startTime = Number(election.startTime) * 1000
             const endTime = Number(election.endTime) * 1000
-
-            if (now > endTime) {
-              completedCount++
-            } else if (now > startTime) {
+            const isCompleted = now > endTime
+            
+            if (now > startTime && now < endTime) {
               activeCount++
-            } else {
-              upcomingCount++
             }
-
-            totalVotes += Number(election.totalVotes)
+            
+            if (isCompleted) {
+              completedCount++
+              votesInCompletedElections += Number(election.totalVotes)
+              
+              // Only add completed elections to chart data
+              completedElectionData.push({
+                name: election.name || `Election ${election.id}`,
+                votes: Number(election.totalVotes)
+              })
+            }
           })
 
           setStats({
             totalElections,
             activeElections: activeCount,
-            upcomingElections: upcomingCount,
             completedElections: completedCount,
-            totalVotes,
+            totalVotesInCompletedElections: votesInCompletedElections
           })
+          
+          // Set chart data with only completed elections
+          setChartData(completedElectionData)
         }
       } catch (err) {
         console.error("Error fetching stats:", err)
@@ -89,10 +102,10 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="p-4 space-y-6">
       <div>
         <h1 className="text-2xl font-semibold text-gray-900">Admin Dashboard</h1>
-        <p className="mt-1 text-sm text-gray-500">Overview of your election system</p>
+        <p className="mt-1 text-sm text-gray-500">Manage elections, candidates, and view results</p>
       </div>
 
       {error && (
@@ -107,102 +120,54 @@ export default function AdminPage() {
 
       {/* Stats cards */}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="overflow-hidden rounded-lg bg-white shadow">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0 rounded-md bg-green-100 p-3">
-                <Vote className="h-6 w-6 text-green-600" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">Total Elections</dt>
-                  <dd>
-                    <div className="text-lg font-medium text-gray-900">{stats.totalElections}</div>
-                  </dd>
-                </dl>
-              </div>
+        <div className="overflow-hidden rounded-lg bg-white shadow p-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-medium text-gray-500">Total Elections</h2>
+              <div className="mt-1 text-3xl font-semibold text-gray-900">{stats.totalElections}</div>
+              <div className="text-xs text-gray-500">Elections created</div>
             </div>
-          </div>
-          <div className="bg-gray-50 px-5 py-3">
-            <div className="text-sm">
-              <Link href="/dashboard/admin/election" className="font-medium text-green-700 hover:text-green-900">
-                View all
-              </Link>
+            <div className="bg-green-100 rounded-full p-3">
+              <Calendar className="h-6 w-6 text-green-600" />
             </div>
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-lg bg-white shadow">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0 rounded-md bg-blue-100 p-3">
-                <Clock className="h-6 w-6 text-blue-600" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">Active Elections</dt>
-                  <dd>
-                    <div className="text-lg font-medium text-gray-900">{stats.activeElections}</div>
-                  </dd>
-                </dl>
-              </div>
+        <div className="overflow-hidden rounded-lg bg-white shadow p-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-medium text-gray-500">Active Elections</h2>
+              <div className="mt-1 text-3xl font-semibold text-gray-900">{stats.activeElections}</div>
+              <div className="text-xs text-gray-500">Currently running</div>
             </div>
-          </div>
-          <div className="bg-gray-50 px-5 py-3">
-            <div className="text-sm">
-              <Link href="/dashboard/admin/election" className="font-medium text-blue-700 hover:text-blue-900">
-                View active
-              </Link>
+            <div className="bg-blue-100 rounded-full p-3">
+              <Clock className="h-6 w-6 text-blue-600" />
             </div>
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-lg bg-white shadow">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0 rounded-md bg-yellow-100 p-3">
-                <Calendar className="h-6 w-6 text-yellow-600" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">Upcoming Elections</dt>
-                  <dd>
-                    <div className="text-lg font-medium text-gray-900">{stats.upcomingElections}</div>
-                  </dd>
-                </dl>
-              </div>
+        <div className="overflow-hidden rounded-lg bg-white shadow p-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-medium text-gray-500">Completed Elections</h2>
+              <div className="mt-1 text-3xl font-semibold text-gray-900">{stats.completedElections}</div>
+              <div className="text-xs text-gray-500">Elections ended</div>
             </div>
-          </div>
-          <div className="bg-gray-50 px-5 py-3">
-            <div className="text-sm">
-              <Link href="/dashboard/admin/election" className="font-medium text-yellow-700 hover:text-yellow-900">
-                View upcoming
-              </Link>
+            <div className="bg-yellow-100 rounded-full p-3">
+              <CheckCircle className="h-6 w-6 text-yellow-600" />
             </div>
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-lg bg-white shadow">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0 rounded-md bg-purple-100 p-3">
-                <CheckCircle className="h-6 w-6 text-purple-600" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">Completed Elections</dt>
-                  <dd>
-                    <div className="text-lg font-medium text-gray-900">{stats.completedElections}</div>
-                  </dd>
-                </dl>
-              </div>
+        <div className="overflow-hidden rounded-lg bg-white shadow p-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-medium text-gray-500">Total Votes</h2>
+              <div className="mt-1 text-3xl font-semibold text-gray-900">{stats.totalVotesInCompletedElections}</div>
+              <div className="text-xs text-gray-500">In completed elections</div>
             </div>
-          </div>
-          <div className="bg-gray-50 px-5 py-3">
-            <div className="text-sm">
-              <Link href="/dashboard/admin/election" className="font-medium text-purple-700 hover:text-purple-900">
-                View completed
-              </Link>
+            <div className="bg-purple-100 rounded-full p-3">
+              <BarChart className="h-6 w-6 text-purple-600" />
             </div>
           </div>
         </div>
@@ -212,106 +177,81 @@ export default function AdminPage() {
       <div className="overflow-hidden rounded-lg bg-white shadow">
         <div className="px-4 py-5 sm:p-6">
           <h2 className="text-lg font-medium text-gray-900">Quick Actions</h2>
-          <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <p className="text-sm text-gray-500">Common administrative tasks</p>
+          
+          <div className="mt-5 space-y-3">
             <Link
               href="/dashboard/admin/election/create"
-              className="inline-flex items-center justify-center rounded-md border border-transparent bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+              className="flex items-center justify-center rounded-md bg-green-600 px-4 py-3 text-sm font-medium text-white shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 w-full"
             >
-              Create New Election
+              <Plus className="h-5 w-5 mr-2" /> Create New Election
             </Link>
+            
             <Link
               href="/dashboard/admin/election"
-              className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+              className="flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 w-full"
             >
-              Manage Elections
+              <Calendar className="h-5 w-5 mr-2" /> Manage Elections
             </Link>
+            
             <Link
-              href="#"
-              className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+              href="/dashboard/admin/results"
+              className="flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 w-full"
             >
-              View Reports
+              <FileText className="h-5 w-5 mr-2" /> View Results
             </Link>
           </div>
         </div>
       </div>
 
-      {/* Recent activity */}
-      <div className="overflow-hidden rounded-lg bg-white shadow">
-        <div className="px-4 py-5 sm:p-6">
-          <h2 className="text-lg font-medium text-gray-900">Recent Activity</h2>
-          <div className="mt-5 flow-root">
-            <ul className="-mb-8">
-              <li>
-                <div className="relative pb-8">
-                  <span className="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true"></span>
-                  <div className="relative flex space-x-3">
-                    <div>
-                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100 ring-8 ring-white">
-                        <Vote className="h-5 w-5 text-green-500" />
-                      </span>
-                    </div>
-                    <div className="flex min-w-0 flex-1 justify-between space-x-4 pt-1.5">
-                      <div>
-                        <p className="text-sm text-gray-500">
-                          New election <span className="font-medium text-gray-900">Presidential Election 2024</span> was
-                          created
-                        </p>
-                      </div>
-                      <div className="whitespace-nowrap text-right text-sm text-gray-500">
-                        <time dateTime="2023-09-20">1 hour ago</time>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </li>
-              <li>
-                <div className="relative pb-8">
-                  <span className="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true"></span>
-                  <div className="relative flex space-x-3">
-                    <div>
-                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 ring-8 ring-white">
-                        <Users className="h-5 w-5 text-blue-500" />
-                      </span>
-                    </div>
-                    <div className="flex min-w-0 flex-1 justify-between space-x-4 pt-1.5">
-                      <div>
-                        <p className="text-sm text-gray-500">
-                          <span className="font-medium text-gray-900">5 new voters</span> registered in the system
-                        </p>
-                      </div>
-                      <div className="whitespace-nowrap text-right text-sm text-gray-500">
-                        <time dateTime="2023-09-20">3 hours ago</time>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </li>
-              <li>
-                <div className="relative pb-8">
-                  <div className="relative flex space-x-3">
-                    <div>
-                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-100 ring-8 ring-white">
-                        <BarChart3 className="h-5 w-5 text-purple-500" />
-                      </span>
-                    </div>
-                    <div className="flex min-w-0 flex-1 justify-between space-x-4 pt-1.5">
-                      <div>
-                        <p className="text-sm text-gray-500">
-                          <span className="font-medium text-gray-900">Local Council Election</span> has ended with 245
-                          total votes
-                        </p>
-                      </div>
-                      <div className="whitespace-nowrap text-right text-sm text-gray-500">
-                        <time dateTime="2023-09-19">Yesterday</time>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </li>
-            </ul>
+      {/* Charts - Only showing completed elections */}
+      {chartData.length > 0 ? (
+        <div className="overflow-hidden rounded-lg bg-white shadow">
+          <div className="px-4 py-5 sm:p-6">
+            <h2 className="text-lg font-medium text-gray-900">Completed Election Results</h2>
+            <p className="text-sm text-gray-500">Vote count for completed elections only</p>
+            
+            <div className="mt-5 h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <RechartsBarChart
+                  data={chartData}
+                  margin={{
+                    top: 20,
+                    right: 30,
+                    left: 20,
+                    bottom: 60,
+                  }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis 
+                    dataKey="name" 
+                    angle={-45} 
+                    textAnchor="end"
+                    height={60}
+                    interval={0}
+                  />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="votes" fill="#4ade80" />
+                </RechartsBarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="overflow-hidden rounded-lg bg-white shadow">
+          <div className="px-4 py-5 sm:p-6">
+            <h2 className="text-lg font-medium text-gray-900">Completed Election Results</h2>
+            <p className="text-sm text-gray-500">No completed elections to display</p>
+            <div className="mt-5 flex items-center justify-center h-60 bg-gray-50 rounded-lg">
+              <div className="text-center">
+                <FileText className="h-12 w-12 text-gray-400 mx-auto" />
+                <p className="mt-2 text-sm text-gray-500">Results will appear here once elections are completed</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

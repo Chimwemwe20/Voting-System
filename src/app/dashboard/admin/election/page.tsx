@@ -76,7 +76,7 @@ export default function ElectionAdminPage() {
             {elections.length > 0 ? (
               elections.map((election) => (
                 <li key={election.id}>
-                  <Link href={`/dashboard/admin/election/ElectionDetails?id=${election.id}`} className="block hover:bg-gray-50">
+                  <Link href={`/dashboard/admin/election/${election.id}`} className="block hover:bg-gray-50">
                     <div className="px-4 py-4 sm:px-6">
                       <div className="flex items-center justify-between">
                         <p className="text-sm font-medium text-green-600 truncate">{election.name}</p>

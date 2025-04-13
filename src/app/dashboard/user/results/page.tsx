@@ -16,7 +16,8 @@ export default function ResultsPage() {
     getElectionDetails,
     getAllCandidatesForElection,
     getAllCandidateVotesForElection,
-    getElectionResults
+    getElectionResults,
+    getCandidateVotes  
   } = useContractInteraction()
   
   const [completedElections, setCompletedElections] = useState([])
@@ -73,39 +74,34 @@ export default function ResultsPage() {
             const candidatesResult = await getAllCandidatesForElection(election.id)
             const candidates = candidatesResult.success ? candidatesResult.candidates : []
             
-            const votesResult = await getAllCandidateVotesForElection(election.id)
-            const candidateVotes = votesResult.success ? votesResult.candidateVotes : []
-            
-            // Find the winner
-            let winnerName = "No votes cast"
-            let winnerVotes = 0
-            let winnerPercentage = 0
-            
-            if (totalVotes > 0 && candidateVotes.length > 0) {
-              const sorted = [...candidateVotes].sort((a, b) => parseInt(b.votes) - parseInt(a.votes))
-              const winnerId = sorted[0].candidateId
-              const winner = candidates.find(c => c.id === winnerId)
-              
-              if (winner) {
-                winnerName = winner.name
-                winnerVotes = parseInt(sorted[0].votes)
-                winnerPercentage = (winnerVotes / totalVotes) * 100
-              }
-            }
-            
-            // Process candidate results
-            const candidateResults = candidates.map(candidate => {
-              const voteInfo = candidateVotes.find(cv => cv.candidateId === candidate.id)
-              const votes = voteInfo ? parseInt(voteInfo.votes) : 0
+            // Use direct candidate vote fetching for each candidate
+            const candidateResults = []
+            for (const candidate of candidates) {
+              const voteResult = await getCandidateVotes(election.id, candidate.id)
+              const votes = voteResult.success ? voteResult.votes : 0
               const percentage = totalVotes > 0 ? (votes / totalVotes) * 100 : 0
               
-              return {
+              candidateResults.push({
                 id: candidate.id,
                 name: candidate.name,
                 votes,
                 percentage
-              }
-            }).sort((a, b) => b.votes - a.votes)
+              })
+            }
+            
+            // Sort by vote count in descending order
+            candidateResults.sort((a, b) => b.votes - a.votes)
+            
+            // Determine the winner
+            let winnerName = "No votes cast"
+            let winnerVotes = 0
+            let winnerPercentage = 0
+            
+            if (totalVotes > 0 && candidateResults.length > 0 && candidateResults[0].votes > 0) {
+              winnerName = candidateResults[0].name
+              winnerVotes = candidateResults[0].votes
+              winnerPercentage = candidateResults[0].percentage
+            }
             
             resultsData[election.id] = {
               totalVotes,
@@ -129,7 +125,7 @@ export default function ResultsPage() {
     }
 
     loadResultsData()
-  }, [account, isRegistered, isLoading, router, getElections, getElectionDetails, getAllCandidatesForElection, getAllCandidateVotesForElection, getElectionResults])
+  }, [account, isRegistered, isLoading, router, getElections, getElectionDetails, getAllCandidatesForElection, getCandidateVotes, getElectionResults])
 
   const formatDate = (timestamp) => {
     return new Date(timestamp * 1000).toLocaleDateString('en-US', {

@@ -34,7 +34,7 @@ export default function ActiveElections({ elections, router }) {
                       </span>
                     ) : (
                       <button
-                        onClick={() => router.push(`/dashboard/user/elections/${election.id}`)}
+                        onClick={() => router.push(`/dashboard/user/elections`)}
                         className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 shadow-sm transition duration-150"
                       >
                         Vote Now

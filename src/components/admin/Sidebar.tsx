@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { BarChart3, Calendar, ChevronDown, ChevronRight, Home, LogOut, Settings, User, Vote } from "lucide-react"
+import { ChevronDown, ChevronRight, Home, LogOut, Settings, User, Vote, BarChart3 } from "lucide-react"
 
 type SidebarProps = {
   isOpen: boolean
@@ -13,11 +13,15 @@ type SidebarProps = {
 export default function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
   const pathname = usePathname()
   const [isElectionSubmenuOpen, setIsElectionSubmenuOpen] = useState(false)
+  const [isReportsSubmenuOpen, setIsReportsSubmenuOpen] = useState(false)
 
   // Check if the current path is under the election section
   useEffect(() => {
     if (pathname.includes("/dashboard/admin/election")) {
       setIsElectionSubmenuOpen(true)
+    }
+    if (pathname.includes("/dashboard/admin/reports")) {
+      setIsReportsSubmenuOpen(true)
     }
   }, [pathname])
 
@@ -107,49 +111,107 @@ export default function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
                         Create Election
                       </Link>
                     </li>
+                    {/* <li>
+                      <Link
+                        href="/dashboard/admin/election/manage"
+                        className={`block rounded-md px-4 py-2 text-sm font-medium ${
+                          isActive("/dashboard/admin/election/manage")
+                            ? "bg-green-50 text-green-700"
+                            : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                        }`}
+                      >
+                        Manage Candidates
+                      </Link>
+                    </li> */}
+                    {/* <li>
+                      <Link
+                        href="/dashboard/admin/election/locations"
+                        className={`block rounded-md px-4 py-2 text-sm font-medium ${
+                          isActive("/dashboard/admin/election/locations")
+                            ? "bg-green-50 text-green-700"
+                            : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                        }`}
+                      >
+                        Voting Locations
+                      </Link>
+                    </li> */}
                   </ul>
                 )}
               </li>
 
               <li>
+                <button
+                  onClick={() => setIsReportsSubmenuOpen(!isReportsSubmenuOpen)}
+                  className={`flex w-full items-center justify-between rounded-md px-4 py-2 text-sm font-medium ${
+                    pathname.includes("/dashboard/admin/reports")
+                      ? "bg-green-100 text-green-700"
+                      : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                  }`}
+                >
+                  <div className="flex items-center">
+                    <BarChart3 className="mr-3 h-5 w-5" />
+                    Reports
+                  </div>
+                  {isReportsSubmenuOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                </button>
+
+                {isReportsSubmenuOpen && (
+                  <ul className="mt-1 space-y-1 pl-10">
+                    <li>
+                      <Link
+                        href="/dashboard/admin/results"
+                        className={`block rounded-md px-4 py-2 text-sm font-medium ${
+                          isActive("/dashboard/admin/results")
+                            ? "bg-green-50 text-green-700"
+                            : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                        }`}
+                      >
+                        Election Results
+                      </Link>
+                    </li>
+                    {/* <li>
+                      <Link
+                        href="/dashboard/admin/reports/location"
+                        className={`block rounded-md px-4 py-2 text-sm font-medium ${
+                          isActive("/dashboard/admin/reports/location")
+                            ? "bg-green-50 text-green-700"
+                            : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                        }`}
+                      >
+                        Location Stats
+                      </Link>
+                    </li> */}
+                  </ul>
+                )}
+              </li>
+
+              {/* <li>
                 <Link
-                  href="#"
-                  className="flex items-center rounded-md px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                  href="/dashboard/admin/users"
+                  className={`flex items-center rounded-md px-4 py-2 text-sm font-medium ${
+                    isActive("/dashboard/admin/users")
+                      ? "bg-green-100 text-green-700" 
+                      : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                  }`}
                 >
                   <User className="mr-3 h-5 w-5" />
-                  Users
+                  User Management
                 </Link>
               </li>
 
               <li>
                 <Link
-                  href="#"
-                  className="flex items-center rounded-md px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900"
-                >
-                  <BarChart3 className="mr-3 h-5 w-5" />
-                  Analytics
-                </Link>
-              </li>
-
-              <li>
-                <Link
-                  href="#"
-                  className="flex items-center rounded-md px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900"
-                >
-                  <Calendar className="mr-3 h-5 w-5" />
-                  Schedule
-                </Link>
-              </li>
-
-              <li>
-                <Link
-                  href="#"
-                  className="flex items-center rounded-md px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                  href="/dashboard/admin/settings"
+                  className={`flex items-center rounded-md px-4 py-2 text-sm font-medium ${
+                    isActive("/dashboard/admin/settings")
+                      ? "bg-green-100 text-green-700"
+                      : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                  }`}
                 >
                   <Settings className="mr-3 h-5 w-5" />
                   Settings
                 </Link>
-              </li>
+              </li> */}
             </ul>
           </nav>
 

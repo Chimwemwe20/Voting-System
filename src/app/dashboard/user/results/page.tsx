@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Loader2, Info, Award, BarChart3 } from "lucide-react"
+import { Loader2, Info, Award, BarChart3, AlertTriangle } from "lucide-react"
 import useContractInteraction from "@/lib/useContractInteraction"
 import Layout from "../components/Layout"
 
@@ -29,7 +29,7 @@ export default function ResultsPage() {
     if (isLoading) return;
 
     if (!account || !isRegistered) {
-      router.replace("/connect")
+      router.replace("/")
       return
     }
 
@@ -92,14 +92,28 @@ export default function ResultsPage() {
             // Sort by vote count in descending order
             candidateResults.sort((a, b) => b.votes - a.votes)
             
-            // Determine the winner
+            // Determine if there's a tie or a clear winner
             let winnerName = "No votes cast"
             let winnerVotes = 0
             let winnerPercentage = 0
+            let isTie = false
+            let tiedCandidates = []
             
             if (totalVotes > 0 && candidateResults.length > 0 && candidateResults[0].votes > 0) {
-              winnerName = candidateResults[0].name
-              winnerVotes = candidateResults[0].votes
+              // Check if there's a tie for first place
+              const highestVotes = candidateResults[0].votes
+              tiedCandidates = candidateResults.filter(c => c.votes === highestVotes)
+              
+              if (tiedCandidates.length > 1) {
+                // There is a tie
+                isTie = true
+                winnerName = `Tie between ${tiedCandidates.map(c => c.name).join(", ")}`
+              } else {
+                // Clear winner
+                winnerName = candidateResults[0].name
+              }
+              
+              winnerVotes = highestVotes
               winnerPercentage = candidateResults[0].percentage
             }
             
@@ -110,6 +124,8 @@ export default function ResultsPage() {
                 votes: winnerVotes,
                 percentage: winnerPercentage
               },
+              isTie,
+              tiedCandidates,
               candidates: candidateResults
             }
           }
@@ -195,17 +211,29 @@ export default function ResultsPage() {
                   
                   {electionResults[election.id] && (
                     <div className="mt-4">
-                      <div className="flex items-center text-green-600">
-                        <Award className="h-5 w-5 mr-2" />
-                        <span className="font-medium">
-                          Winner: {electionResults[election.id].winner.name}
-                          {electionResults[election.id].winner.votes > 0 && (
+                      {electionResults[election.id].isTie ? (
+                        <div className="flex items-center text-amber-600">
+                          <AlertTriangle className="h-5 w-5 mr-2" />
+                          <span className="font-medium">
+                            Tie: {electionResults[election.id].tiedCandidates.map(c => c.name).join(" and ")}
                             <span className="ml-2 text-sm text-gray-500">
-                              ({electionResults[election.id].winner.votes} votes · {electionResults[election.id].winner.percentage.toFixed(1)}%)
+                              ({electionResults[election.id].winner.votes} votes each · {electionResults[election.id].winner.percentage.toFixed(1)}%)
                             </span>
-                          )}
-                        </span>
-                      </div>
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center text-green-600">
+                          <Award className="h-5 w-5 mr-2" />
+                          <span className="font-medium">
+                            Winner: {electionResults[election.id].winner.name}
+                            {electionResults[election.id].winner.votes > 0 && (
+                              <span className="ml-2 text-sm text-gray-500">
+                                ({electionResults[election.id].winner.votes} votes · {electionResults[election.id].winner.percentage.toFixed(1)}%)
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -217,23 +245,44 @@ export default function ResultsPage() {
                       Detailed Results
                     </h4>
                     
-                    <div className="space-y-4">
-                      {electionResults[election.id].candidates.map(candidate => (
-                        <div key={candidate.id} className="space-y-2">
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm font-medium text-gray-900">{candidate.name}</span>
-                            <span className="text-sm text-gray-500">
-                              {candidate.votes} votes ({candidate.percentage.toFixed(1)}%)
-                            </span>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2.5">
-                            <div 
-                              className="bg-green-600 h-2.5 rounded-full" 
-                              style={{ width: `${candidate.percentage}%` }}
-                            ></div>
+                    {electionResults[election.id].isTie && (
+                      <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-md text-amber-800 text-sm">
+                        <div className="flex items-start">
+                          <AlertTriangle className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <p className="font-medium">Tie detected</p>
+                            <p className="mt-1">Multiple candidates received the highest number of votes ({electionResults[election.id].winner.votes}). 
+                            A tiebreaker may be required according to election rules.</p>
                           </div>
                         </div>
-                      ))}
+                      </div>
+                    )}
+                    
+                    <div className="space-y-4">
+                      {electionResults[election.id].candidates.map(candidate => {
+                        const isTiedForFirst = electionResults[election.id].isTie && 
+                                              electionResults[election.id].tiedCandidates.some(c => c.id === candidate.id);
+                        
+                        return (
+                          <div key={candidate.id} className="space-y-2">
+                            <div className="flex justify-between items-center">
+                              <span className={`text-sm font-medium ${isTiedForFirst ? 'text-amber-700' : 'text-gray-900'}`}>
+                                {candidate.name}
+                                {isTiedForFirst && <span className="ml-2 text-xs">(Tied for 1st)</span>}
+                              </span>
+                              <span className="text-sm text-gray-500">
+                                {candidate.votes} votes ({candidate.percentage.toFixed(1)}%)
+                              </span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2.5">
+                              <div 
+                                className={`${isTiedForFirst ? 'bg-amber-500' : 'bg-green-600'} h-2.5 rounded-full`} 
+                                style={{ width: `${candidate.percentage}%` }}
+                              ></div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}

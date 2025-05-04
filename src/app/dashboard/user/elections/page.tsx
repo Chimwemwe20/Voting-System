@@ -30,7 +30,7 @@ export default function ElectionsPage() {
     if (isLoading) return;
 
     if (!account || !isRegistered) {
-      router.replace("/connect")
+      router.replace("/")
       return
     }
 
@@ -199,7 +199,7 @@ export default function ElectionsPage() {
                   {filteredElections.map((election) => (
                     <li key={election.id}>
                       <div className="px-4 py-4 sm:px-6 hover:bg-gray-50 cursor-pointer" 
-                           onClick={() => router.push(`/dashboard/user/elections/${election.id}`)}>
+                           onClick={() => router.push(`/dashboard/user/elections`)}>
                         <div className="flex items-center justify-between">
                           <div className="flex-1 min-w-0">
                             <h3 className="text-lg font-medium text-gray-900 truncate">{election.name}</h3>

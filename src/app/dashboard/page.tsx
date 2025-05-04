@@ -14,7 +14,7 @@ export default function HomePage() {
 
     const redirect = () => {
       if (!account) {
-        router.replace("/connect")
+        router.replace("/")
       } else if (account && isRegistered) {
         if (isAdmin) {
           router.replace("/dashboard/admin")
@@ -22,7 +22,7 @@ export default function HomePage() {
           router.replace("/dashboard/user")
         }
       } else if (account && !isRegistered) {
-        router.replace("/connect")
+        router.replace("/")
       }
     }
 

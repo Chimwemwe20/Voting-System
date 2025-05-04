@@ -25,7 +25,7 @@ export default function UpcomingElections({ elections, router }) {
                   <span>Starts: {formatDate(election.startTime)}</span>
                 </div>
                 <button
-                  onClick={() => router.push(`/dashboard/user/elections/${election.id}`)}
+                  onClick={() => router.push(`/dashboard/user/elections`)}
                   className="mt-3 px-3 py-1 bg-blue-100 text-blue-700 text-sm rounded-md hover:bg-blue-200 transition duration-150"
                 >
                   View Details

@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { BarChart3, Calendar, CheckCircle, Clock, Users, Vote, Plus, BarChart, FileText } from "lucide-react"
+import { BarChart3, Calendar, CheckCircle, Clock, Users, Vote, Plus, BarChart, FileText, Loader } from "lucide-react"
 import useContractInteraction from "@/lib/useContractInteraction"
-import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
+import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts"
 
 export default function AdminPage() {
   const { getElections, getElectionsCount, isAdmin, isLoading } = useContractInteraction()
@@ -17,8 +17,9 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   
-  // Sample data for the chart - will be replaced with real data
-  const [chartData, setChartData] = useState([])
+  // Data for charts
+  const [completedElectionsData, setCompletedElectionsData] = useState([])
+  const [totalElectionsData, setTotalElectionsData] = useState([])
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -38,14 +39,18 @@ export default function AdminPage() {
           let completedCount = 0
           let votesInCompletedElections = 0
           
-          // Process elections for chart data
+          // Process completed elections data
           const completedElectionData = []
+          
+          // Create data structure for total elections by date
+          const electionsMap = new Map()
 
           result.elections.forEach((election) => {
             const startTime = Number(election.startTime) * 1000
             const endTime = Number(election.endTime) * 1000
             const isCompleted = now > endTime
             
+            // Track active and completed
             if (now > startTime && now < endTime) {
               activeCount++
             }
@@ -54,11 +59,46 @@ export default function AdminPage() {
               completedCount++
               votesInCompletedElections += Number(election.totalVotes)
               
-              // Only add completed elections to chart data
+              // Add completed elections to chart data
               completedElectionData.push({
                 name: election.name || `Election ${election.id}`,
                 votes: Number(election.totalVotes)
               })
+            }
+            
+            // Format date for the x-axis of total elections chart
+            const creationDate = new Date(startTime).toLocaleDateString('en-US', {
+              month: 'short', 
+              day: 'numeric'
+            })
+            
+            // Count elections by creation date
+            if (electionsMap.has(creationDate)) {
+              electionsMap.set(creationDate, electionsMap.get(creationDate) + 1)
+            } else {
+              electionsMap.set(creationDate, 1)
+            }
+          })
+
+          // Convert map to chart data array and sort by date
+          const electionsByDate = Array.from(electionsMap.entries()).map(([date, count]) => ({
+            date,
+            elections: count
+          }))
+          
+          // Sort by date
+          electionsByDate.sort((a, b) => {
+            return new Date(a.date) - new Date(b.date)
+          })
+          
+          // Add cumulative total
+          let runningTotal = 0
+          const totalElectionsChart = electionsByDate.map(item => {
+            runningTotal += item.elections
+            return {
+              date: item.date,
+              total: runningTotal,
+              new: item.elections
             }
           })
 
@@ -69,8 +109,8 @@ export default function AdminPage() {
             totalVotesInCompletedElections: votesInCompletedElections
           })
           
-          // Set chart data with only completed elections
-          setChartData(completedElectionData)
+          setCompletedElectionsData(completedElectionData)
+          setTotalElectionsData(totalElectionsChart)
         }
       } catch (err) {
         console.error("Error fetching stats:", err)
@@ -86,7 +126,15 @@ export default function AdminPage() {
   }, [getElections, getElectionsCount, isLoading])
 
   if (isLoading || loading) {
-    return <div className="flex h-full items-center justify-center">Loading dashboard...</div>
+    return (
+      <div className="flex flex-col h-screen items-center justify-center">
+        <div className="animate-spin mb-4">
+          <Loader className="h-10 w-10 text-green-600" />
+        </div>
+        <p className="text-lg font-medium text-gray-700">Loading dashboard data...</p>
+        <p className="text-sm text-gray-500 mt-2">Please wait while we fetch election statistics</p>
+      </div>
+    )
   }
 
   if (!isAdmin) {
@@ -204,8 +252,60 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* Charts - Only showing completed elections */}
-      {chartData.length > 0 ? (
+      {/* NEW: Total Elections Created Chart */}
+      <div className="overflow-hidden rounded-lg bg-white shadow">
+        <div className="px-4 py-5 sm:p-6">
+          <h2 className="text-lg font-medium text-gray-900">Total Elections Created</h2>
+          <p className="text-sm text-gray-500">Growth of elections over time</p>
+          
+          {totalElectionsData.length > 0 ? (
+            <div className="mt-5 h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={totalElectionsData}
+                  margin={{
+                    top: 20,
+                    right: 30,
+                    left: 20,
+                    bottom: 60,
+                  }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis 
+                    dataKey="date" 
+                    angle={-45} 
+                    textAnchor="end"
+                    height={60}
+                    interval={0}
+                  />
+                  <YAxis />
+                  <Tooltip />
+                  <Line 
+                    type="monotone" 
+                    dataKey="total" 
+                    stroke="#2563eb" 
+                    strokeWidth={2} 
+                    dot={{ r: 4 }}
+                    activeDot={{ r: 6 }}
+                    name="Total Elections"
+                  />
+                  <Bar dataKey="new" fill="#93c5fd" name="New Elections" />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="mt-5 flex items-center justify-center h-60 bg-gray-50 rounded-lg">
+              <div className="text-center">
+                <BarChart3 className="h-12 w-12 text-gray-400 mx-auto" />
+                <p className="mt-2 text-sm text-gray-500">No election data available to display</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Original: Completed Elections Chart with different color scheme */}
+      {completedElectionsData.length > 0 ? (
         <div className="overflow-hidden rounded-lg bg-white shadow">
           <div className="px-4 py-5 sm:p-6">
             <h2 className="text-lg font-medium text-gray-900">Completed Election Results</h2>
@@ -214,7 +314,7 @@ export default function AdminPage() {
             <div className="mt-5 h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <RechartsBarChart
-                  data={chartData}
+                  data={completedElectionsData}
                   margin={{
                     top: 20,
                     right: 30,
@@ -232,7 +332,7 @@ export default function AdminPage() {
                   />
                   <YAxis />
                   <Tooltip />
-                  <Bar dataKey="votes" fill="#4ade80" />
+                  <Bar dataKey="votes" fill="#059669" name="Total Votes" />
                 </RechartsBarChart>
               </ResponsiveContainer>
             </div>

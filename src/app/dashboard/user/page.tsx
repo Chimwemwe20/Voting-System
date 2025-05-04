@@ -33,7 +33,7 @@ export default function UserDashboard() {
     if (isLoading) return;
 
     if (!account || !isRegistered) {
-      router.replace("/connect")
+      router.replace("/")
       return
     }
 

@@ -28,18 +28,10 @@ export default function Layout({ account, children }) {
                 <Vote className="mr-3 h-5 w-5 text-gray-400 group-hover:text-gray-500" />
                 Elections
               </a>
-              {/* <a href="/dashboard/user/candidates" className="text-gray-600 hover:bg-gray-50 hover:text-gray-900 group flex items-center px-2 py-3 text-sm font-medium rounded-md">
-                <User className="mr-3 h-5 w-5 text-gray-400 group-hover:text-gray-500" />
-                Candidates
-              </a> */}
               <a href="/dashboard/user/results" className="text-gray-600 hover:bg-gray-50 hover:text-gray-900 group flex items-center px-2 py-3 text-sm font-medium rounded-md">
                 <CalendarDays className="mr-3 h-5 w-5 text-gray-400 group-hover:text-gray-500" />
                 Results
               </a>
-              {/* <a href="/dashboard/user/settings" className="text-gray-600 hover:bg-gray-50 hover:text-gray-900 group flex items-center px-2 py-3 text-sm font-medium rounded-md">
-                <Settings className="mr-3 h-5 w-5 text-gray-400 group-hover:text-gray-500" />
-                Settings
-              </a> */}
             </nav>
           </div>
         </div>
@@ -103,17 +95,9 @@ export default function Layout({ account, children }) {
                 <Vote className="mr-3 h-5 w-5 text-gray-400 group-hover:text-gray-500" />
                 Elections
               </a>
-              <a href="/dashboard/user/candidates" className="text-gray-600 hover:bg-gray-50 hover:text-gray-900 group flex items-center px-2 py-3 text-base font-medium rounded-md">
-                <User className="mr-3 h-5 w-5 text-gray-400 group-hover:text-gray-500" />
-                Candidates
-              </a>
               <a href="/dashboard/user/results" className="text-gray-600 hover:bg-gray-50 hover:text-gray-900 group flex items-center px-2 py-3 text-base font-medium rounded-md">
                 <CalendarDays className="mr-3 h-5 w-5 text-gray-400 group-hover:text-gray-500" />
                 Results
-              </a>
-              <a href="/dashboard/user/settings" className="text-gray-600 hover:bg-gray-50 hover:text-gray-900 group flex items-center px-2 py-3 text-base font-medium rounded-md">
-                <Settings className="mr-3 h-5 w-5 text-gray-400 group-hover:text-gray-500" />
-                Settings
               </a>
             </nav>
           </div>
@@ -139,15 +123,6 @@ export default function Layout({ account, children }) {
         <main className="flex-1 bg-gray-50 p-4 md:p-8">
           {children}
         </main>
-
-        {/* Footer */}
-        {/* <footer className="bg-white border-t border-gray-200 py-4">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-center text-gray-500 text-sm">
-              © {new Date().getFullYear()} SecureVote. All rights reserved.
-            </div>
-          </div>
-        </footer> */}
       </div>
     </div>
   )
